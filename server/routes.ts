@@ -1,11 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { MockStorage } from './mock-storage';
+import { storageManager } from './storage-manager';
 import { aiService } from './services/ai';
 import { insertTaskSchema, insertContextEntrySchema, insertCategorySchema } from '../shared/schema';
-
-// Use mock storage for demonstration while database connection is being set up
-const storage = new MockStorage();
 
 const router = Router();
 
@@ -19,9 +16,29 @@ const validateBody = (schema: z.ZodSchema) => (req: any, res: any, next: any) =>
   }
 };
 
+// Health check endpoint with storage info
+router.get('/api/health', async (req, res) => {
+  try {
+    const storage = await storageManager.getStorage();
+    const storageInfo = storageManager.getStorageInfo();
+    res.json({
+      status: 'healthy',
+      storage: storageInfo,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'unhealthy', 
+      error: 'Storage initialization failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Task routes
 router.get('/api/tasks', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const tasks = await storage.getTasks();
     res.json(tasks);
   } catch (error) {
@@ -31,6 +48,7 @@ router.get('/api/tasks', async (req, res) => {
 
 router.get('/api/tasks/:id', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const id = parseInt(req.params.id);
     const task = await storage.getTaskById(id);
     if (!task) {
@@ -44,6 +62,7 @@ router.get('/api/tasks/:id', async (req, res) => {
 
 router.post('/api/tasks', validateBody(insertTaskSchema), async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const task = await storage.createTask(req.body);
     res.status(201).json(task);
   } catch (error) {
@@ -53,6 +72,7 @@ router.post('/api/tasks', validateBody(insertTaskSchema), async (req, res) => {
 
 router.patch('/api/tasks/:id', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const id = parseInt(req.params.id);
     const updates = req.body;
     const task = await storage.updateTask(id, updates);
@@ -67,6 +87,7 @@ router.patch('/api/tasks/:id', async (req, res) => {
 
 router.delete('/api/tasks/:id', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const id = parseInt(req.params.id);
     await storage.deleteTask(id);
     res.status(204).send();
@@ -88,6 +109,7 @@ router.post('/api/tasks/ai-enhance', async (req, res) => {
     }
 
     // Get recent context for AI enhancement
+    const storage = await storageManager.getStorage();
     const contextEntries = await storage.getContextEntries();
     const recentContext = contextEntries.slice(0, 5);
 
@@ -108,6 +130,7 @@ router.post('/api/tasks/ai-enhance', async (req, res) => {
 // Context routes
 router.get('/api/context', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const entries = await storage.getContextEntries();
     res.json(entries);
   } catch (error) {
@@ -117,6 +140,7 @@ router.get('/api/context', async (req, res) => {
 
 router.post('/api/context', validateBody(insertContextEntrySchema), async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const entry = await storage.createContextEntry(req.body);
     res.status(201).json(entry);
   } catch (error) {
@@ -132,6 +156,8 @@ router.post('/api/context/process', async (req, res) => {
     if (!entries || !Array.isArray(entries)) {
       return res.status(400).json({ error: 'Entries array is required' });
     }
+
+    const storage = await storageManager.getStorage();
 
     // Create context entries
     const contextEntries = await Promise.all(
@@ -162,6 +188,7 @@ router.post('/api/context/process', async (req, res) => {
 // Task prioritization
 router.post('/api/tasks/prioritize', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const tasks = await storage.getTasks();
     const contextEntries = await storage.getContextEntries();
     const recentContext = contextEntries.slice(0, 10);
@@ -177,6 +204,7 @@ router.post('/api/tasks/prioritize', async (req, res) => {
 // AI suggestions
 router.get('/api/ai/suggestions', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const tasks = await storage.getTasks();
     const contextEntries = await storage.getContextEntries();
     const recentContext = contextEntries.slice(0, 5);
@@ -185,13 +213,14 @@ router.get('/api/ai/suggestions', async (req, res) => {
     res.json(suggestions);
   } catch (error) {
     console.error('AI suggestions error:', error);
-    res.status(500).json({ error: 'Failed to generate AI suggestions' });
+    res.json([]); // Return empty array instead of error for suggestions
   }
 });
 
 // Category routes
 router.get('/api/categories', async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const categories = await storage.getCategories();
     res.json(categories);
   } catch (error) {
@@ -201,6 +230,7 @@ router.get('/api/categories', async (req, res) => {
 
 router.post('/api/categories', validateBody(insertCategorySchema), async (req, res) => {
   try {
+    const storage = await storageManager.getStorage();
     const category = await storage.createCategory(req.body);
     res.status(201).json(category);
   } catch (error) {
