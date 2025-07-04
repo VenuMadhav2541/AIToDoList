@@ -1,0 +1,127 @@
+{
+  "contextEntries": [
+    {
+      "sourceType": "email",
+      "content": "From: manager@company.com\nSubject: Q1 Review Meeting - Action Required\n\nHi Team,\n\nWe need to prepare our quarterly presentation for the board meeting this Friday, July 5th. Please ensure all deliverables are ready and the financial summary is included. The presentation should cover:\n\n- Revenue growth metrics\n- Project completion status\n- Resource allocation\n- Q2 planning overview\n\nPlease have your sections ready by Thursday EOD for final review.\n\nBest regards,\nSarah Chen\nProject Manager",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "message",
+      "content": "WhatsApp - Family Group:\n\nMom: \"Hey everyone! Planning a family dinner this Saturday at 6 PM. Can someone pick up groceries? We need ingredients for pasta and Caesar salad. Also need to grab some wine for the adults.\"\n\nDad: \"I can help with groceries if someone sends me a list\"\n\nSister: \"I'll make the dessert! Planning to bake chocolate chip cookies\"\n\nYou: \"I can handle the grocery shopping. Will go Saturday morning.\"",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "note",
+      "content": "Meeting Notes - Project Planning Session\nDate: July 4, 2025\nAttendees: Development Team, Product Manager, UX Designer\n\nKey Discussion Points:\n- New feature requirements for mobile app\n- Timeline: 2 weeks for implementation phase\n- Need to schedule weekly team reviews\n- User testing feedback integration needed\n\nAction Items:\n1. Create detailed project roadmap by Monday\n2. Set up development environment for new features\n3. Schedule user interview sessions\n4. Review and update UI/UX mockups\n5. Estimate resource requirements for Q3\n\nNext Meeting: Tuesday 10 AM",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "email",
+      "content": "From: dentist@healthcareplus.com\nSubject: Appointment Reminder\n\nDear Patient,\n\nThis is a reminder that you have a dental cleaning appointment scheduled for:\n\nDate: Friday, July 5th, 2025\nTime: 2:00 PM\nLocation: HealthCare Plus Dental\n123 Main Street, Suite 200\n\nPlease arrive 15 minutes early for check-in. If you need to reschedule, please call us at (555) 123-4567.\n\nThank you,\nHealthCare Plus Dental Team",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "message",
+      "content": "Slack - #dev-team channel:\n\nJohn: \"The API integration for the payment system is almost complete. Just need to handle the webhook validation.\"\n\nAlice: \"Great! I've finished the frontend components. When can we test the full flow?\"\n\nManager: \"Let's aim for Monday testing. Make sure all edge cases are covered.\"\n\nJohn: \"Will do. I'll create a test plan document this weekend.\"\n\nAlice: \"Perfect. I'll also write up the user acceptance criteria.\"",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "note",
+      "content": "Personal Learning Goals - July 2025\n\nBooks to Read:\n1. \"The Lean Startup\" by Eric Ries (Priority: Medium)\n2. \"Clean Code\" by Robert Martin (Priority: High)\n3. \"System Design Interview\" by Alex Xu (Priority: Medium)\n\nOnline Courses:\n- Complete React Advanced Patterns course\n- Finish AWS Solutions Architect certification\n- Learn TypeScript advanced features\n\nSide Projects:\n- Build personal portfolio website\n- Contribute to open source projects\n- Create a mobile app prototype\n\nProgress Notes:\n- Currently 30% through \"The Lean Startup\"\n- React course: 6/12 modules completed\n- Portfolio website: design phase",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "email",
+      "content": "From: gym@fitnessplus.com\nSubject: Weekly Workout Schedule\n\nHi Fitness Enthusiast,\n\nYour personal trainer has updated your workout schedule for this week:\n\nMonday: Upper body strength training (7 AM)\nWednesday: Cardio and core workout (7 AM)\nFriday: Full body HIIT session (7 AM)\nSaturday: Yoga and stretching (9 AM)\n\nRemember to bring your water bottle and towel. If you need to reschedule any session, please give us at least 2 hours notice.\n\nStay strong!\nFitness Plus Team",
+      "isProcessed": false
+    },
+    {
+      "sourceType": "message",
+      "content": "Text Message - Friend Group:\n\nAlex: \"Movie night this Sunday? There's a new thriller everyone's talking about.\"\n\nSamantha: \"I'm in! What time?\"\n\nMike: \"Sounds great. My place or cinema?\"\n\nYou: \"Cinema sounds good. How about the 7 PM show?\"\n\nAlex: \"Perfect! I'll book tickets for 7 PM. IMAX or regular?\"\n\nSamantha: \"IMAX for the full experience!\"\n\nMike: \"Agreed. See everyone Sunday!\"",
+      "isProcessed": false
+    }
+  ],
+  "expectedAIInsights": {
+    "extractedTasks": [
+      {
+        "title": "Prepare Q1 quarterly presentation",
+        "description": "Create comprehensive presentation for board meeting covering revenue growth, project status, resource allocation, and Q2 planning",
+        "category": "Work",
+        "priority": "high",
+        "urgency": 9,
+        "deadline": "2025-07-05"
+      },
+      {
+        "title": "Buy groceries for family dinner",
+        "description": "Purchase pasta ingredients, Caesar salad components, and wine for Saturday family dinner",
+        "category": "Personal",
+        "priority": "medium",
+        "urgency": 6,
+        "deadline": "2025-07-05"
+      },
+      {
+        "title": "Create project roadmap",
+        "description": "Develop detailed roadmap for new mobile app features based on team meeting discussions",
+        "category": "Work",
+        "priority": "high",
+        "urgency": 8,
+        "deadline": "2025-07-07"
+      },
+      {
+        "title": "Attend dental appointment",
+        "description": "Dental cleaning appointment at HealthCare Plus Dental",
+        "category": "Health",
+        "priority": "medium",
+        "urgency": 7,
+        "deadline": "2025-07-05"
+      },
+      {
+        "title": "Continue reading The Lean Startup",
+        "description": "Progress through learning goals, currently 30% complete",
+        "category": "Learning",
+        "priority": "low",
+        "urgency": 3,
+        "deadline": "2025-07-31"
+      }
+    ],
+    "suggestions": [
+      {
+        "type": "schedule",
+        "message": "Block 3-4 hours Thursday morning for presentation preparation when you're most productive",
+        "actionable": true
+      },
+      {
+        "type": "optimize",
+        "message": "Combine grocery shopping with other errands to maximize efficiency",
+        "actionable": true
+      },
+      {
+        "type": "delegate",
+        "message": "Consider assigning team members specific sections of the project roadmap based on their expertise",
+        "actionable": true
+      },
+      {
+        "type": "break",
+        "message": "Schedule breaks between high-priority work tasks to maintain focus and productivity",
+        "actionable": true
+      }
+    ]
+  },
+  "testingInstructions": {
+    "howToUse": [
+      "Copy individual context entries from the contextEntries array",
+      "Paste them into the Context Input page of the application",
+      "Use different source types (email, message, note) to test categorization",
+      "Process with AI to see how the system extracts tasks and generates suggestions",
+      "Compare AI output with expectedAIInsights to validate functionality"
+    ],
+    "testScenarios": [
+      "Test urgent work deadlines (Q1 presentation)",
+      "Test personal/family obligations (grocery shopping)",
+      "Test health appointments (dental visit)",
+      "Test learning goals (book reading)",
+      "Test team collaboration context (project planning)",
+      "Test mixed priority tasks in single context session"
+    ]
+  }
+}
