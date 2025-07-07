@@ -1,3 +1,4 @@
+// task-modal.tsx
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,12 +14,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { X, Lightbulb } from 'lucide-react';
 
+// taskFormSchema remains z.string().optional() because HTML input[type=date] returns string
 const taskFormSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
   priority: z.enum(['high', 'medium', 'low']),
-  deadline: z.string().optional(),
+  deadline: z.string().optional(), 
   estimatedTime: z.string().optional(),
 });
 
@@ -31,7 +33,7 @@ interface Task {
   category: string;
   priority: 'high' | 'medium' | 'low';
   status: 'pending' | 'completed';
-  deadline?: string;
+  deadline?: Date | ''; // Changed from string to Date | ''
   estimatedTime?: string;
   aiEnhanced?: boolean;
 }
@@ -45,9 +47,9 @@ interface TaskModalProps {
 const defaultCategories = [
   { name: 'Work', color: 'blue' },
   { name: 'Personal', color: 'green' },
-  { name: 'Learning', color: 'purple' },
-  { name: 'Health', color: 'red' },
-  { name: 'Shopping', color: 'orange' },
+  { name: 'Learning', 'color': 'purple' },
+  { name: 'Health', 'color': 'red' },
+  { name: 'Shopping', 'color': 'orange' },
 ];
 
 export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
@@ -61,7 +63,10 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
       description: task.description || '',
       category: task.category,
       priority: task.priority,
-      deadline: task.deadline ? new Date(task.deadline).toISOString().split('T')[0] : '',
+      // Format the existing deadline for the date input field
+      deadline: task.deadline instanceof Date
+        ? task.deadline.toISOString().split('T')[0]
+        : '', // If it's a Date object, format it for input type="date". Otherwise, it's an empty string.
       estimatedTime: task.estimatedTime || '',
     },
   });
@@ -75,11 +80,12 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
         },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to update task');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error', details: null }));
+        throw new Error(errorData.error || 'Failed to update task', { cause: errorData.details });
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
@@ -90,21 +96,45 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       onClose();
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Failed to update task:", error);
       toast({
         title: "Error",
-        description: "Failed to update task. Please try again.",
+        description: `Failed to update task: ${error.message}. Details: ${JSON.stringify(error.cause)}`,
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: TaskFormData) => {
-    updateTaskMutation.mutate(data);
+    const dataToSend: { [key: string]: any } = { ...data };
+
+    // Convert deadline string from form input to a Date object or undefined for backend
+    if (dataToSend.deadline === '') {
+      dataToSend.deadline = undefined; // Send undefined if no deadline
+    } else {
+      const parsedDate = new Date(dataToSend.deadline);
+      if (!isNaN(parsedDate.getTime())) {
+        dataToSend.deadline = parsedDate; // Send as Date object (JSON.stringify will convert to ISO string)
+      } else {
+        dataToSend.deadline = undefined; // Invalid date string
+      }
+    }
+
+    console.log("\n\n\nData being sent to backend (from TaskModal):", JSON.stringify(dataToSend, null, 2));
+
+    updateTaskMutation.mutate(dataToSend as TaskFormData);
   };
 
-  const formatDateForDisplay = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDateForDisplay = (dateValue: Date | string) => { // Updated to accept Date or string
+    if (dateValue === '') {
+      return 'N/A'; // Or handle as desired for no deadline
+    }
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
@@ -124,7 +154,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -236,6 +266,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
             </div>
 
             {/* AI Suggestion Card */}
+            {task.aiEnhanced && (
             <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
               <CardContent className="p-4">
                 <div className="flex items-start space-x-2">
@@ -243,7 +274,7 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                   <div>
                     <h4 className="font-medium text-blue-900 dark:text-blue-200">AI Suggestion</h4>
                     <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                      Based on your schedule and context, I recommend completing this task 
+                      Based on your schedule and context, I recommend completing this task
                       {task.deadline && ` by ${formatDateForDisplay(task.deadline)}`}
                       {task.priority === 'high' && ' as soon as possible due to its high priority'}
                       {task.priority === 'medium' && ' during your next available time slot'}
@@ -253,13 +284,14 @@ export default function TaskModal({ task, isOpen, onClose }: TaskModalProps) {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             <div className="flex items-center justify-end space-x-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={updateTaskMutation.isPending}
                 className="bg-blue-600 hover:bg-blue-700"
               >

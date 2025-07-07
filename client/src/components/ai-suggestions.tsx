@@ -3,9 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Lightbulb, CalendarPlus, Users, Clock } from 'lucide-react';
 
 export default function AISuggestions() {
-  const { data: suggestions = [], isLoading } = useQuery({
+ const { data: suggestions = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/ai/suggestions'],
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    queryFn: async () => { 
+      const res = await fetch('/api/ai/suggestions');
+      return res.json();
+    },
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const getIconForSuggestionType = (type: string) => {

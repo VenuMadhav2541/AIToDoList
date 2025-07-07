@@ -35,6 +35,7 @@ export class Storage implements IStorage {
   async createTask(task: InsertTask): Promise<Task> {
     const result = await db.insert(tasks).values({
       ...task,
+      createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
     

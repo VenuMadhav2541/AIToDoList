@@ -1,10 +1,21 @@
 import OpenAI from 'openai';
 import type { AITaskSuggestion, AIContextInsights, Task, ContextEntry } from '../../shared/schema';
+import 'dotenv/config';
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || 'lm-studio',
+  baseURL: process.env.LM_STUDIO_API || 'http://127.0.0.1:1234/v1',
 });
+
+function sanitizeJSON(raw: string): string {
+  try {
+    // Remove code blocks like ```json ... ```
+    raw = raw.trim().replace(/^```json\s*/i, '').replace(/```$/, '');
+    return raw.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+  } catch (e) {
+    return raw;
+  }
+}
 
 export class AIService {
   async enhanceTask(taskData: {
@@ -14,7 +25,7 @@ export class AIService {
     contextEntries?: ContextEntry[];
   }): Promise<AITaskSuggestion> {
     const contextText = taskData.contextEntries?.map(c => c.content).join('\n\n') || '';
-    
+
     const prompt = `
 Analyze this task and provide AI-powered enhancements based on the context provided.
 
@@ -35,33 +46,22 @@ Please provide a JSON response with the following structure:
   "estimatedTime": "Time estimate with unit",
   "reasoning": "Brief explanation of the suggestions"
 }
-
-Consider:
-- Urgency based on context
-- Task complexity
-- Dependencies mentioned in context
-- Deadlines mentioned in context
-- User's workload patterns
 `;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'mistralai/mistral-7b-instruct-v0.3',
         messages: [
           {
-            role: 'system',
-            content: 'You are an AI task management assistant. Analyze tasks and provide intelligent enhancements based on context. Always respond with valid JSON.',
-          },
-          {
             role: 'user',
-            content: prompt,
+            content: `You are an AI task management assistant. Always respond with valid JSON.\n\n${prompt}`,
           },
         ],
-        response_format: { type: 'json_object' },
         temperature: 0.7,
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const raw = sanitizeJSON(response.choices[0].message.content || '{}');
+      const result = JSON.parse(raw);
       return result as AITaskSuggestion;
     } catch (error) {
       console.error('AI enhancement error:', error);
@@ -70,7 +70,7 @@ Consider:
   }
 
   async processContext(contextEntries: ContextEntry[]): Promise<AIContextInsights> {
-    const contextText = contextEntries.map(entry => 
+    const contextText = contextEntries.map(entry =>
       `[${entry.sourceType.toUpperCase()}] ${entry.content}`
     ).join('\n\n');
 
@@ -106,33 +106,17 @@ Please provide a JSON response with the following structure:
     }
   ]
 }
-
-Focus on:
-- Extracting new tasks from emails, messages, and notes
-- Identifying urgent matters that need immediate attention
-- Suggesting schedule optimizations
-- Recommending task prioritization changes
-- Providing time management insights
 `;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI context analysis assistant. Extract actionable task management insights from daily context. Always respond with valid JSON.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        response_format: { type: 'json_object' },
+        model: 'mistralai/mistral-7b-instruct-v0.3',
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const raw = sanitizeJSON(response.choices[0].message.content || '{}');
+      const result = JSON.parse(raw);
       return result as AIContextInsights;
     } catch (error) {
       console.error('AI context processing error:', error);
@@ -142,7 +126,7 @@ Focus on:
 
   async prioritizeTasks(tasks: Task[], contextEntries: ContextEntry[]): Promise<Task[]> {
     const contextText = contextEntries.map(c => c.content).join('\n\n');
-    const tasksText = tasks.map(t => 
+    const tasksText = tasks.map(t =>
       `ID: ${t.id}, Title: ${t.title}, Category: ${t.category}, Current Priority: ${t.priority}`
     ).join('\n');
 
@@ -155,52 +139,33 @@ ${tasksText}
 Context:
 ${contextText}
 
-Please provide a JSON response with an array of task IDs ordered by priority (most urgent first):
+Please provide a JSON response:
 {
   "prioritizedTaskIds": [1, 3, 2, 4],
   "reasoning": "Brief explanation of the prioritization logic"
 }
-
-Consider:
-- Deadlines mentioned in context
-- Business impact
-- Dependencies
-- User's schedule and commitments
-- External pressures and requirements
 `;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI task prioritization assistant. Analyze tasks and context to determine optimal priority order. Always respond with valid JSON.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        response_format: { type: 'json_object' },
+        model: 'mistralai/mistral-7b-instruct-v0.3',
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const raw = sanitizeJSON(response.choices[0].message.content || '{}');
+      const result = JSON.parse(raw);
       const prioritizedIds = result.prioritizedTaskIds || [];
-      
-      // Reorder tasks based on AI prioritization
+
       const prioritizedTasks = prioritizedIds
         .map((id: number) => tasks.find(t => t.id === id))
-        .filter(Boolean);
-      
-      // Add any tasks that weren't included in the prioritization
+        .filter(Boolean) as Task[];
+
       const remainingTasks = tasks.filter(t => !prioritizedIds.includes(t.id));
-      
       return [...prioritizedTasks, ...remainingTasks];
     } catch (error) {
       console.error('AI prioritization error:', error);
-      return tasks; // Return original order if AI fails
+      return tasks;
     }
   }
 
@@ -210,7 +175,7 @@ Consider:
     actionable: boolean;
   }>> {
     const contextText = contextEntries.slice(0, 5).map(c => c.content).join('\n\n');
-    const tasksText = tasks.slice(0, 10).map(t => 
+    const tasksText = tasks.slice(0, 10).map(t =>
       `${t.title} (${t.priority} priority, ${t.category})`
     ).join('\n');
 
@@ -223,7 +188,7 @@ ${tasksText}
 Recent Context:
 ${contextText}
 
-Please provide a JSON response with suggestions:
+Please provide a JSON response:
 {
   "suggestions": [
     {
@@ -233,33 +198,17 @@ Please provide a JSON response with suggestions:
     }
   ]
 }
-
-Focus on:
-- Schedule optimization based on energy patterns
-- Task batching opportunities
-- Break recommendations for productivity
-- Delegation opportunities
-- Context-based insights
 `;
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an AI productivity assistant. Provide actionable suggestions for better task management. Always respond with valid JSON.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        response_format: { type: 'json_object' },
+        model: 'mistralai/mistral-7b-instruct-v0.3',
+        messages: [{ role: 'user', content: prompt }],
         temperature: 0.6,
       });
 
-      const result = JSON.parse(response.choices[0].message.content || '{}');
+      const raw = sanitizeJSON(response.choices[0].message.content || '{}');
+      const result = JSON.parse(raw);
       return result.suggestions || [];
     } catch (error) {
       console.error('AI suggestions error:', error);

@@ -1,8 +1,10 @@
 import { Router } from 'express';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import { storageManager } from './storage-manager';
 import { aiService } from './services/ai';
 import { insertTaskSchema, insertContextEntrySchema, insertCategorySchema } from '../shared/schema';
+import { date } from 'drizzle-orm/mysql-core';
+
 
 const router = Router();
 
@@ -12,7 +14,14 @@ const validateBody = (schema: z.ZodSchema) => (req: any, res: any, next: any) =>
     req.body = schema.parse(req.body);
     next();
   } catch (error) {
-    res.status(400).json({ error: 'Invalid request body', details: error });
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        error: 'Invalid request body',
+        details: error.issues,
+      });
+    }
+    console.error("Unexpected error in validateBody:", error);
+    res.status(500).json({ error: 'An unexpected validation error occurred' });
   }
 };
 
@@ -27,8 +36,8 @@ router.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    res.status(500).json({ 
-      status: 'unhealthy', 
+    res.status(500).json({
+      status: 'unhealthy',
       error: 'Storage initialization failed',
       timestamp: new Date().toISOString()
     });
@@ -75,12 +84,15 @@ router.patch('/api/tasks/:id', async (req, res) => {
     const storage = await storageManager.getStorage();
     const id = parseInt(req.params.id);
     const updates = req.body;
+    const x = new Date(req.body.deadline)
+    updates.deadline = x;
     const task = await storage.updateTask(id, updates);
     res.json(task);
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
       return res.status(404).json({ error: error.message });
     }
+    console.log(error);
     res.status(500).json({ error: 'Failed to update task' });
   }
 });
@@ -103,12 +115,11 @@ router.delete('/api/tasks/:id', async (req, res) => {
 router.post('/api/tasks/ai-enhance', async (req, res) => {
   try {
     const { title, description, category } = req.body;
-    
+
     if (!title) {
       return res.status(400).json({ error: 'Title is required' });
     }
 
-    // Get recent context for AI enhancement
     const storage = await storageManager.getStorage();
     const contextEntries = await storage.getContextEntries();
     const recentContext = contextEntries.slice(0, 5);
@@ -152,24 +163,24 @@ router.post('/api/context', validateBody(insertContextEntrySchema), async (req, 
 router.post('/api/context/process', async (req, res) => {
   try {
     const { entries } = req.body;
-    
+
     if (!entries || !Array.isArray(entries)) {
       return res.status(400).json({ error: 'Entries array is required' });
     }
 
     const storage = await storageManager.getStorage();
 
-    // Create context entries
+    // 1. Store the submitted context entries
     const contextEntries = await Promise.all(
       entries.map((entry: any) => storage.createContextEntry(entry))
     );
 
-    // Process with AI
+    // 2. Send to AI service to extract insights
     const insights = await aiService.processContext(contextEntries);
 
-    // Update context entries with processed insights
+    // 3. Update the context entries with AI insights
     await Promise.all(
-      contextEntries.map(entry => 
+      contextEntries.map(entry =>
         storage.updateContextEntry(entry.id, {
           processedInsights: insights,
           extractedTasks: insights.extractedTasks,
@@ -178,12 +189,27 @@ router.post('/api/context/process', async (req, res) => {
       )
     );
 
+    // ✅ 4. Create new tasks from extractedTasks with aiEnhanced flag
+    if (insights.extractedTasks && insights.extractedTasks.length > 0) {
+      await Promise.all(
+        insights.extractedTasks.map(task =>
+          storage.createTask({
+            ...task,
+            status: 'pending',
+            aiEnhanced: true,
+          })
+        )
+      );
+    }
+
+    // 5. Return the insights
     res.json(insights);
   } catch (error) {
     console.error('Context processing error:', error);
     res.status(500).json({ error: 'Failed to process context with AI' });
   }
 });
+
 
 // Task prioritization
 router.post('/api/tasks/prioritize', async (req, res) => {
@@ -213,7 +239,7 @@ router.get('/api/ai/suggestions', async (req, res) => {
     res.json(suggestions);
   } catch (error) {
     console.error('AI suggestions error:', error);
-    res.json([]); // Return empty array instead of error for suggestions
+    res.json([]);
   }
 });
 

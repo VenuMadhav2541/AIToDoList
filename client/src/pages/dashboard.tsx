@@ -1,53 +1,90 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import TaskForm from '@/components/task-form';
 import TaskList from '@/components/task-list';
 import AISuggestions from '@/components/ai-suggestions';
 import CategoriesSidebar from '@/components/categories-sidebar';
-import { Sparkles, TriangleAlert, Clock, Plus, Filter, ArrowUpDown } from 'lucide-react';
+import { Sparkles, TriangleAlert, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { type Task as DBTask } from '@shared/schema';
 
-export default function Dashboard() {
-  const [filter, setFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('priority');
+interface DashboardProps {
+  searchTerm?: string;
+}
 
-  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+export default function Dashboard({ searchTerm = '' }: DashboardProps) {
+  const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [sortBy, setSortBy] = useState<'priority' | 'deadline' | 'createdAt'>('priority');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery<DBTask[]>({
     queryKey: ['/api/tasks'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks');
+      const json = await res.json();
+      return json.map((task: DBTask) => ({
+        ...task,
+        deadline: task.deadline ? new Date(task.deadline) : undefined,
+        createdAt: task.createdAt ? new Date(task.createdAt) : undefined,
+        updatedAt: task.updatedAt ? new Date(task.updatedAt) : undefined,
+      }));
+    },
   });
 
-  const { data: suggestions = [], isLoading: suggestionsLoading } = useQuery({
+  const { data: suggestions = [] } = useQuery({
     queryKey: ['/api/ai/suggestions'],
+    queryFn: async () => {
+      const res = await fetch('/api/ai/suggestions');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 5,
   });
 
-  const pendingTasks = tasks.filter((task: any) => task.status === 'pending');
-  const highPriorityTasks = pendingTasks.filter((task: any) => task.priority === 'high');
-  const dueTodayTasks = pendingTasks.filter((task: any) => {
+  const pendingTasks = tasks.filter((task) => task.status === 'pending');
+  const highPriorityTasks = pendingTasks.filter((task) => task.priority === 'high');
+  const dueTodayTasks = pendingTasks.filter((task) => {
     if (!task.deadline) return false;
-    const today = new Date().toDateString();
-    return new Date(task.deadline).toDateString() === today;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadlineDate = new Date(task.deadline);
+    deadlineDate.setHours(0, 0, 0, 0);
+    return deadlineDate.getTime() === today.getTime();
   });
 
-  const completedTasks = tasks.filter((task: any) => task.status === 'completed');
+  const completedTasks = tasks.filter((task) => task.status === 'completed');
   const totalTasks = tasks.length;
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
 
-  const handlePrioritize = async () => {
-    try {
-      const response = await fetch('/api/tasks/prioritize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        window.location.reload(); // Simple refresh to show updated priorities
+  const filteredAndSortedTasks = tasks
+    .filter((task) => {
+      const matchesSearch =
+        !searchTerm ||
+        task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (!matchesSearch) return false;
+      if (filter !== 'all' && task.status !== filter) return false;
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const map = { high: 3, medium: 2, low: 1 };
+      if (sortBy === 'priority') {
+        return (map[b.priority] ?? 0) - (map[a.priority] ?? 0);
+      } else if (sortBy === 'deadline') {
+        const timeA = a.deadline ? a.deadline.getTime() : Number.MAX_SAFE_INTEGER;
+        const timeB = b.deadline ? b.deadline.getTime() : Number.MAX_SAFE_INTEGER;
+        return timeA - timeB;
+      } else {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeB - timeA;
       }
-    } catch (error) {
-      console.error('Failed to prioritize tasks:', error);
-    }
-  };
+    });
 
   if (tasksLoading) {
     return (
@@ -59,8 +96,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* AI Insights Panel */}
-      <Card className="ai-gradient text-white">
+      <Card className="ai-gradient text-white" style={{ backgroundColor: 'black' }}>
         <CardContent className="p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -99,9 +135,7 @@ export default function Dashboard() {
       </Card>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Main Tasks Panel */}
         <div className="flex-1 space-y-6">
-          {/* Task Creation Panel */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -117,67 +151,54 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Tasks List */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between mb-4">
                 <CardTitle>Tasks</CardTitle>
                 <div className="flex items-center space-x-2">
-                  <Button
-                    variant={filter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFilter('all')}
-                  >
+                  <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
                     All
                   </Button>
-                  <Button
-                    variant={filter === 'pending' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFilter('pending')}
-                  >
+                  <Button variant={filter === 'pending' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('pending')}>
                     Pending
                   </Button>
-                  <Button
-                    variant={filter === 'completed' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFilter('completed')}
-                  >
+                  <Button variant={filter === 'completed' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('completed')}>
                     Completed
                   </Button>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm">
-                  <Filter className="w-4 h-4 mr-2" />
-                  Filter
-                </Button>
-                <Button variant="outline" size="sm">
-                  <ArrowUpDown className="w-4 h-4 mr-2" />
-                  Sort by Priority
-                </Button>
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  onClick={handlePrioritize}
-                  className="bg-blue-600 hover:bg-blue-700"
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value as typeof priorityFilter)}
+                  className="border rounded px-2 py-1 text-sm"
                 >
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  AI Optimize
-                </Button>
+                  <option value="all">All Priorities</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  <option value="priority">Sort by Priority</option>
+                  <option value="deadline">Sort by Deadline</option>
+                  <option value="createdAt">Sort by Created Date</option>
+                </select>
               </div>
             </CardHeader>
             <CardContent>
-              <TaskList tasks={tasks} filter={filter} />
+              <TaskList tasks={filteredAndSortedTasks} filter={filter} />
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="w-full lg:w-80 space-y-6">
           <AISuggestions />
           <CategoriesSidebar />
-          
-          {/* Progress Overview */}
+
           <Card>
             <CardHeader>
               <CardTitle>Today's Progress</CardTitle>
@@ -189,10 +210,7 @@ export default function Dashboard() {
                   <span>{completedTasks.length} of {totalTasks}</span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                    style={{ width: `${progressPercentage}%` }}
-                  ></div>
+                  <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
                 </div>
               </div>
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -201,7 +219,9 @@ export default function Dashboard() {
                   <span className="font-semibold text-blue-600">{progressPercentage}%</span>
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {progressPercentage >= 70 ? "Great work! You're ahead of your weekly average." : "Keep going! You're making progress."}
+                  {progressPercentage >= 70
+                    ? "Great work! You're ahead of your weekly average."
+                    : "Keep going! You're making progress."}
                 </p>
               </div>
             </CardContent>

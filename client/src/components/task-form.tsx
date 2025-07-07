@@ -6,8 +6,13 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import type { Category } from '../../../shared/schema';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
+import {
+  Form, FormControl, FormField, FormItem, FormLabel, FormMessage
+} from '@/components/ui/form';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Sparkles, Lightbulb } from 'lucide-react';
@@ -17,8 +22,9 @@ const taskFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
   priority: z.enum(['high', 'medium', 'low']),
-  deadline: z.string().optional(),
+  deadline: z.string().optional(), // Frontend schema still expects string from input[type=date]
   estimatedTime: z.string().optional(),
+  status: z.enum(['pending', 'completed']).default('pending'),
 });
 
 type TaskFormData = z.infer<typeof taskFormSchema>;
@@ -37,7 +43,7 @@ export default function TaskForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
   });
 
@@ -50,6 +56,7 @@ export default function TaskForm() {
       priority: 'medium',
       deadline: '',
       estimatedTime: '',
+      status: 'pending',
     },
   });
 
@@ -57,32 +64,32 @@ export default function TaskForm() {
     mutationFn: async (data: TaskFormData) => {
       const response = await fetch('/api/tasks', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to create task');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error', details: null }));
+        throw new Error(errorData.error || 'Failed to create task', { cause: errorData.details });
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Task Created",
-        description: "Your task has been created successfully.",
+        title: 'Task Created',
+        description: 'Your task has been created successfully.',
       });
       form.reset();
       setAiSuggestion(null);
       queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Failed to create task:", error);
       toast({
-        title: "Error",
-        description: "Failed to create task. Please try again.",
-        variant: "destructive",
+        title: 'Error',
+        description: `Failed to create task: ${error.message}. Details: ${JSON.stringify(error.cause)}`,
+        variant: 'destructive',
       });
     },
   });
@@ -91,48 +98,46 @@ export default function TaskForm() {
     mutationFn: async (data: { title: string; description?: string; category?: string }) => {
       const response = await fetch('/api/tasks/ai-enhance', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to enhance task');
       }
-      
+
       return response.json();
     },
     onSuccess: (data) => {
       setAiSuggestion(data);
       toast({
-        title: "AI Enhancement Complete",
-        description: "Task has been enhanced with AI suggestions.",
+        title: 'AI Enhancement Complete',
+        description: 'Task has been enhanced with AI suggestions.',
       });
     },
     onError: () => {
       toast({
-        title: "Enhancement Failed",
-        description: "Failed to enhance task with AI. Please try again.",
-        variant: "destructive",
+        title: 'Enhancement Failed',
+        description: 'Failed to enhance task with AI. Please try again.',
+        variant: 'destructive',
       });
     },
   });
 
-  const handleAiEnhance = async () => {
+  const handleAiEnhance = () => {
     const title = form.getValues('title');
     const description = form.getValues('description');
     const category = form.getValues('category');
-    
+
     if (!title) {
       toast({
-        title: "Title Required",
-        description: "Please enter a task title first.",
-        variant: "destructive",
+        title: 'Title Required',
+        description: 'Please enter a task title first.',
+        variant: 'destructive',
       });
       return;
     }
-    
+
     setIsEnhancing(true);
     enhanceTaskMutation.mutate({ title, description, category });
     setIsEnhancing(false);
@@ -144,18 +149,30 @@ export default function TaskForm() {
       form.setValue('category', aiSuggestion.suggestedCategory);
       form.setValue('priority', aiSuggestion.suggestedPriority);
       form.setValue('estimatedTime', aiSuggestion.estimatedTime);
-      
+
       if (aiSuggestion.suggestedDeadline) {
-        const deadline = new Date(aiSuggestion.suggestedDeadline);
-        if (!isNaN(deadline.getTime())) {
-          form.setValue('deadline', deadline.toISOString().split('T')[0]);
+        const deadlineDate = new Date(aiSuggestion.suggestedDeadline);
+        if (!isNaN(deadlineDate.getTime())) {
+          // Keep this as YYYY-MM-DD for the HTML input type="date" field display
+          form.setValue('deadline', deadlineDate.toISOString().split('T')[0]);
         }
       }
     }
   };
 
   const onSubmit = (data: TaskFormData) => {
-    createTaskMutation.mutate(data);
+    const dataToSend: { [key: string]: any } = { ...data };
+
+    // Simply ensure empty string becomes undefined for optional fields
+    if (dataToSend.deadline === '') {
+      dataToSend.deadline = undefined;
+    }
+    // No need for toISOString() here, z.coerce.date() on backend will handle it.
+
+    // Log the dataToSend object as a string for reliable output
+    console.log("\n\n\nData being sent to backend (from TaskForm):", JSON.stringify(dataToSend, null, 2));
+
+    createTaskMutation.mutate(dataToSend as TaskFormData);
   };
 
   const availableCategories = categories.length > 0 ? categories : defaultCategories;
@@ -171,11 +188,7 @@ export default function TaskForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormControl>
-                    <Input
-                      placeholder="What needs to be done?"
-                      className="pr-12"
-                      {...field}
-                    />
+                    <Input placeholder="What needs to be done?" className="pr-12" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -203,11 +216,7 @@ export default function TaskForm() {
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <Textarea
-                    placeholder="Add description..."
-                    className="min-h-[60px]"
-                    {...field}
-                  />
+                  <Textarea placeholder="Add description..." className="min-h-[60px]" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -275,11 +284,7 @@ export default function TaskForm() {
             />
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={createTaskMutation.isPending}
-          >
+          <Button type="submit" className="w-full" disabled={createTaskMutation.isPending}>
             {createTaskMutation.isPending ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -306,8 +311,8 @@ export default function TaskForm() {
                   {aiSuggestion.reasoning}
                 </p>
                 <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                  <strong>Category:</strong> {aiSuggestion.suggestedCategory} • 
-                  <strong> Priority:</strong> {aiSuggestion.suggestedPriority} • 
+                  <strong>Category:</strong> {aiSuggestion.suggestedCategory} •
+                  <strong> Priority:</strong> {aiSuggestion.suggestedPriority} •
                   <strong> Time:</strong> {aiSuggestion.estimatedTime}
                 </div>
                 <Button
