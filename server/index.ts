@@ -62,6 +62,7 @@ app.use((req, res, next) => {
 
   // ✅ FIX: Removed `reusePort`, kept 'localhost' to avoid ENOTSUP
   server.listen(port, 'localhost', () => {
+    console.log("DATABASE_URL =", connectionString);
     log(`serving on http://localhost:${port}`);
   });
 })();
