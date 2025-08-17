@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sparkles, Lightbulb, CalendarPlus, Users, Clock } from 'lucide-react';
 
 export default function AISuggestions() {
+  //Featch Data from the server using Routing
  const { data: suggestions = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/ai/suggestions'],
     queryFn: async () => { 

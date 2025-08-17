@@ -42,7 +42,59 @@ Built with **React + Express + PostgreSQL + Tailwind CSS** and enhanced using **
 ---
 
 ## 📷 Screenshots
-All schreenshorts are avalable in the **Screenshorts_project** Folder. **Please consider them**.
+**Dashboard:**
+
+
+![Dashboard_Main](Screenshots_project/dashboard.png)
+
+
+![Dashboard_2](Screenshots_project/dashboard-2.png)
+
+
+✨ **Create Tasks using AI:**
+
+
+![AI_Task_Creater](Screenshots_project/AI_PoweredTaskCreater.png)
+
+
+**🗒️ Task Editing:**
+
+
+![TaskEdit](Screenshots_project/taskEditDashboard.png)
+
+
+**🔍 Searchbar Working:**
+
+
+![search](Screenshots_project/SearchbarWorking.png)
+
+
+**🔔 Notification:**
+
+
+![notification](Screenshots_project/notification_bell_working.png)
+
+
+**💬 Context creater:**
+
+
+![create_context](Screenshots_project/context_page.png)
+
+
+**📅 Calendar View:**
+
+
+![calendar](Screenshots_project/Calendar_page.png)
+
+
+![deatils_in_calender](Screenshots_project/popupInCalendar.png)
+
+
+**🌓 Dark Mode:**
+
+
+![darkmode](Screenshots_project/DarkMode.png)
+
 
 ## 🛠️ Tech Stack
 
